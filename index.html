@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Packet Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+        .button-container {
+            margin: 20px 0;
+        }
+        button {
+            margin-right: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        #fileInfo {
+            margin-top: 20px;
+            font-family: monospace;
+        }
+        .data-container {
+            margin-top: 20px;
+            display: flex;
+            gap: 20px;
+        }
+        .ip-list {
+            width: 200px;
+            border-right: 1px solid #ccc;
+        }
+        .queue-info {
+            flex-grow: 1;
+        }
+        .ip-item {
+            padding: 8px;
+            cursor: pointer;
+        }
+        .ip-item:hover {
+            background-color: #f0f0f0;
+        }
+        .ip-item.selected {
+            background-color: #e0e0e0;
+        }
+        .queue-data {
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+    <h1>Packet Viewer</h1>
+    <div class="button-container">
+        <button id="openDumpFile">Open Dump File</button>
+        <button id="openTailFile">Open Tail File</button>
+    </div>
+    <div id="fileInfo"></div>
+    <div class="data-container">
+        <div class="ip-list" id="ipList"></div>
+        <div class="queue-info" id="queueInfo"></div>
+    </div>
+
+    <script>
+        let dumpData = null;
+        let tailData = null;
+        let selectedIp = null;
+
+        const dumpFileBtn = document.getElementById('openDumpFile');
+        const tailFileBtn = document.getElementById('openTailFile');
+        const fileInfo = document.getElementById('fileInfo');
+        const ipList = document.getElementById('ipList');
+        const queueInfo = document.getElementById('queueInfo');
+
+        function displayIpList() {
+            if (!dumpData) return;
+            
+            ipList.innerHTML = '';
+            dumpData.forEach(ip => {
+                const div = document.createElement('div');
+                div.className = 'ip-item';
+                div.textContent = `IP ${ip.ip}`;
+                div.onclick = () => selectIp(ip.ip);
+                ipList.appendChild(div);
+            });
+        }
+
+        function selectIp(ip) {
+            selectedIp = ip;
+            document.querySelectorAll('.ip-item').forEach(item => {
+                item.classList.remove('selected');
+                if (item.textContent === `IP ${ip}`) {
+                    item.classList.add('selected');
+                }
+            });
+            displayQueueInfo();
+        }
+
+        function displayQueueInfo() {
+            if (!dumpData || selectedIp === null) return;
+
+            const ip = dumpData.find(data => data.ip === selectedIp);
+            const tail = tailData ? tailData.find(data => data.ip === selectedIp) : null;
+            
+            let html = `<h2>IP ${selectedIp} Queue Information</h2>`;
+            
+            for (const [queueSize, queueData] of Object.entries(ip.queues)) {
+                const tailValue = tail ? tail.queues[queueSize] : 'N/A';
+                html += `<h3>${queueSize}B Queue (Tail: ${tailValue})</h3>`;
+                html += '<div class="queue-data">';
+                
+                queueData.forEach((packet, index) => {
+                    if (index === tailValue) {
+                        html += '-> ';
+                    } else {
+                        html += '   ';
+                    }
+                    html += `[${index}] ${packet.toString('hex')}\n`;
+                });
+                
+                html += '</div>';
+            }
+            
+            queueInfo.innerHTML = html;
+        }
+
+        dumpFileBtn.addEventListener('click', async () => {
+            const filePath = await window.electronAPI.openDumpFile();
+            if (filePath) {
+                fileInfo.textContent = `Dump file selected: ${filePath}`;
+                dumpData = await window.electronAPI.readDumpFile(filePath);
+                displayIpList();
+                if (selectedIp !== null) {
+                    displayQueueInfo();
+                }
+            }
+        });
+
+        tailFileBtn.addEventListener('click', async () => {
+            const filePath = await window.electronAPI.openTailFile();
+            if (filePath) {
+                fileInfo.textContent = `Tail file selected: ${filePath}`;
+                tailData = await window.electronAPI.readTailFile(filePath);
+                if (selectedIp !== null) {
+                    displayQueueInfo();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "packet-viewer",
+  "version": "1.0.0",
+  "description": "Packet analyzer tool",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "electron": "^28.1.4"
+  }
+}
